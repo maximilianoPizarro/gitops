@@ -1,0 +1,10 @@
+apiVersion: tekton.dev/v1alpha1
+kind: PipelineResource
+metadata:
+  name: $(inputs.params.tag)
+  namespace: pipelines-tutorial-shell
+spec:
+  params:
+    - name: url
+      value: quay.io/maximilianopizarro/vote-api:$(inputs.params.tag)
+  type: image

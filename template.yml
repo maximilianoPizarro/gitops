@@ -1,0 +1,134 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: ${PARAM_APP_NAME}
+  annotations:
+    description: "Template para aplicacion ${PARAM_APP_NAME}"
+    iconClass: "icon-java"
+
+parameters:
+  - name: PARAM_PROJECT_NAME
+    displayName: Nombre del proyecto
+    description: Nombre del proyecto en openshift.
+    required: true
+  - name: PARAM_APP_NAME
+    displayName: Nombre de la aplicacion
+    description: Nombre de la aplicacion en el proyecto de openshift.
+    required: true
+  - name: PARAM_URL
+    displayName: URL de la aplicacion
+    description: URL de la aplicacion en el proyecto de openshift.
+    required: true
+
+objects:
+
+#### DEPLOYCONFIG ####
+
+- apiVersion: apps.openshift.io/v1
+  kind: DeploymentConfig
+  metadata:
+    labels:
+      app: ${PARAM_APP_NAME}
+    name: ${PARAM_APP_NAME}
+  spec:
+    selector:
+      app: ${PARAM_APP_NAME}
+      deploymentconfig: ${PARAM_APP_NAME}
+    template:
+      metadata:
+        labels:
+          app: ${PARAM_APP_NAME}
+          deploymentconfig: ${PARAM_APP_NAME}
+      spec:
+        replicas: 1
+        containers:
+
+        # Container de aplicacion.
+        - name: ${PARAM_APP_NAME}
+          image: ${PARAM_PROJECT_NAME}/${PARAM_APP_NAME}:latest
+          imagePullPolicy: Always
+          ports:
+          - containerPort: 8080
+            protocol: TCP
+          resources:
+            limits:
+              memory: 512mi
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - name: ${PARAM_APP_NAME}-configuration-volume
+              mountPath: /opt/jboss/container/java/application.properties
+              subPath: application.properties
+          args:
+            - /usr/local/s2i/run
+            - "--spring.config.location=/opt/jboss/container/java/application.properties"
+          env:
+              - name: JAVA_OPTIONS
+                value: "-Xms1024m -Xmx2048m -XX:-UseGCOverheadLimit -XX:-ExitOnOutOfMemoryError -XX:+UseParallelGC -Dfile.encoding=UTF8 -Duser.timezone=America/Buenos_Aires"
+              - name: JAVA_MAX_MEM_RATIO
+                value: "85"
+              - name: JAVA_INITIAL_MEM_RATIO
+                value: "50"
+              - name: JAVA_MAX_INITIAL_MEM
+                value: "2048"
+              - name: GC_MAX_METASPACE_SIZE
+                value: "1024"
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        terminationGracePeriodSeconds: 30
+        volumes:
+            - name: ${PARAM_APP_NAME}-configuration-volume
+              configMap:
+                defaultMode: 420
+                name: ${PARAM_APP_NAME}-configuration
+    test: false
+
+#### CONFIG MAP ####
+
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    labels:
+      app: ${PARAM_APP_NAME}
+    name: ${PARAM_APP_NAME}-configuration
+
+  data:
+    application.properties: |
+
+#### ROUTES ####
+
+- apiVersion: route.openshift.io/v1
+  kind: Route
+  metadata:
+    labels:
+      app: ${PARAM_APP_NAME}
+    name: ${PARAM_APP_NAME}
+  spec:
+    host: ${PARAM_URL}
+    port:
+      targetPort: http
+    to:
+      kind: Service
+      name: ${PARAM_APP_NAME}
+
+#### SERVICE ####
+
+- apiVersion: v1
+  kind: Service
+  metadata:
+    labels:
+      app: ${PARAM_APP_NAME}
+    name: ${PARAM_APP_NAME}
+  spec:
+    ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: 8080
+    selector:
+      app: ${PARAM_APP_NAME}
+      deploymentconfig: ${PARAM_APP_NAME}
+    sessionAffinity: None
+    type: ClusterIP

@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: ${PARAM_APP_NAME}
+  annotations:
+    description: "Template para aplicacion ${PARAM_APP_NAME}"
+    iconClass: "icon-symfony"
+    tags: "web,php,symphony"
+
+parameters:
+  - name: PARAM_APP_NAME
+    displayName: Nombre de la aplicacion
+    description: Nombre de la aplicacion en el proyecto de openshift.
+    required: true
+objects:
+
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: ${PARAM_APP_NAME}-configuration
+  data:
+    config.php: |-
+        <?php
